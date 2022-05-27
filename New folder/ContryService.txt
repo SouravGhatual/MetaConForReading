@@ -1,0 +1,270 @@
+package com.amx.jax.service;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.amx.amxlib.exception.jax.GlobalException;
+import com.amx.amxlib.meta.model.CountryMasterDTO;
+import com.amx.amxlib.model.response.ApiResponse;
+import com.amx.amxlib.model.response.ResponseStatus;
+import com.amx.jax.api.AmxApiResponse;
+import com.amx.jax.constant.ConstantDocument;
+import com.amx.jax.dbmodel.CountryMaster;
+import com.amx.jax.dbmodel.CountryMasterDesc;
+import com.amx.jax.dbmodel.CountryMasterView;
+import com.amx.jax.dbmodel.exchrate.RoutingCountryModel;
+import com.amx.jax.exchrate.response.CountryDTO;
+import com.amx.jax.meta.MetaData;
+import com.amx.jax.repository.CountryMasterRepository;
+import com.amx.jax.repository.CountryRepository;
+import com.amx.jax.repository.CustomerRepository;
+import com.amx.jax.repository.exchrate.IRoutingCountryRepo;
+import com.amx.jax.services.AbstractService;
+/**
+ * 
+ * @author Rabil
+ *
+ */
+
+@Service
+public class CountryService extends AbstractService {
+	@Autowired
+	CountryRepository countryRepository;
+	
+	@Autowired
+	CountryMasterRepository countryMasterRepository;
+	
+	@Autowired
+	CustomerRepository customerRepository;
+	
+	@Autowired
+	MetaData meta;
+	
+	@Autowired
+	IRoutingCountryRepo iCountryRepo;
+	
+	private Logger logger = Logger.getLogger(CountryService.class);
+	
+	public AmxApiResponse<CountryMasterView, Object> getCountryListResponse() {
+	
+		List<CountryMasterView> countryList = null;
+		BigDecimal languageIdValue = new BigDecimal("1");
+		ApiResponse response = getBlackApiResponse();
+		
+		if(meta.getLanguageId()!=null)
+		countryList = countryRepository.findByLanguageId(meta.getLanguageId());
+
+		if (countryList.isEmpty() || meta.getLanguageId()==null) {
+			
+		countryList = countryRepository.findByLanguageId(languageIdValue);
+		response.getData().getValues().addAll(countryList);
+		response.setResponseStatus(ResponseStatus.OK);
+		}
+		
+		if(null != countryList) {
+			Iterator<CountryMasterView> itr = countryList.iterator();
+			while(itr.hasNext()) {
+				if(ConstantDocument.ALL_COUNTRIES.equals(itr.next().getCountryName())) {
+					itr.remove();
+				}
+			}
+		}
+		
+		
+		if(countryList.isEmpty()) {
+			throw new GlobalException("Country list is not abaliable");
+		}else {
+		response.getData().getValues().addAll(countryList);
+		response.setResponseStatus(ResponseStatus.OK);
+		}
+		response.getData().setType("country");
+		return AmxApiResponse.buildList(countryList);
+	}
+	
+	
+	@Deprecated
+	public AmxApiResponse<CountryMasterView, Object> getCountryListByLanguageIdResponse(BigDecimal languageId){
+		List<CountryMasterView> countryList = countryRepository.findByLanguageId(languageId);		
+		if(countryList.isEmpty()) {
+			throw new GlobalException("Country list is not abaliable");
+		}	
+		return AmxApiResponse.buildList(countryList);
+	}
+	
+	
+	public AmxApiResponse<CountryMasterView, Object> getCountryByLanguageIdAndCountryIdResponse(BigDecimal languageId,BigDecimal countryId){
+		List<CountryMasterView> countryList = countryRepository.findByLanguageIdAndCountryId(languageId,countryId);
+		
+		if(countryList.isEmpty()) {
+			throw new GlobalException("Country is not abaliable");
+		}
+		return AmxApiResponse.buildList(countryList);
+	}
+	
+
+	
+	public AmxApiResponse<CountryMasterView, Object> getBusinessCountryResponse(BigDecimal languageId){
+		List<CountryMasterView> countryList = countryRepository.getBusinessCountry(languageId);
+		if(countryList.isEmpty()) {
+			throw new GlobalException("Business country is not abaliable");
+		}
+		return AmxApiResponse.buildList(countryList);
+	}
+	
+	
+	
+	private List<CountryMasterDTO> convert(List<CountryMasterView> countryList) {
+		List<CountryMasterDTO> list = new ArrayList<>();
+		for (CountryMasterView country : countryList) {
+			CountryMasterDTO model = new CountryMasterDTO();
+			model.setIdNo(country.getIdNo());
+			model.setBusinessCountry(country.getBusinessCountry());
+			model.setCountryActive(country.getCountryActive());
+			model.setCountryAlpha2Code(country.getCountryAlpha2Code());
+			model.setCountryAlpha3Code(country.getCountryAlpha3Code());
+			model.setCountryCode(country.getCountryCode());
+			model.setCountryId(country.getCountryId());
+			model.setCountryName(country.getCountryName());
+			model.setCountryTelCode(country.getCountryTelCode());
+			model.setCountryISOCode(country.getCountryISOCode());
+			model.setLanguageCode(country.getLanguageCode());
+			model.setLanguageName(country.getLanguageName());
+			model.setLanguageId(country.getLanguageId());
+			
+			
+			list.add(model);
+		}
+		return list;
+	}
+
+	@Override
+	public String getModelType() {
+		return "country";
+	}
+
+	@Override
+	public Class<?> getModelClass() {
+		return null;
+	}
+	
+	public boolean isBangladeshCountry(BigDecimal countryId) {
+		String countryAlfa3Code = countryRepository.findByLanguageIdAndCountryId(meta.getLanguageId(), countryId).get(0)
+				.getCountryAlpha3Code();
+		if (ConstantDocument.BANGLADESH_ALPHA3_CODE.equals(countryAlfa3Code)) {
+			return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * @param countryId
+	 * @return CountryMaster
+	 * 
+	 */
+	public CountryMaster getCountryMaster(BigDecimal countryId) {
+		return countryMasterRepository.findOne(countryId);
+	}
+	
+	public AmxApiResponse<CountryMasterView, Object> getCountryListOffsite(){
+		List<CountryMasterView> countryList = countryRepository.findByLanguageId(meta.getLanguageId());		
+		if(countryList.isEmpty()) {
+			throw new GlobalException("Country list is not abaliable");
+		}	
+		return AmxApiResponse.buildList(countryList);	
+	}
+	
+	public CountryMasterDesc getCountryMasterDesc(BigDecimal countryId, BigDecimal languageId) {
+		List<CountryMasterDesc> countryMasterDescs = countryMasterRepository.findOne(countryId)
+				.getFsCountryMasterDescs();
+		CountryMasterDesc countryMasterDesc = null;
+		for (CountryMasterDesc desc : countryMasterDescs) {
+			if (desc.getFsLanguageType().getLanguageId().equals(languageId)) {
+				countryMasterDesc = desc;
+				break;
+			}
+		}
+		return countryMasterDesc;
+	}
+	
+	public Boolean getIsArabicCountry(BigDecimal countryId) {
+		Boolean isArabic = false;
+		
+		CountryMaster countryMaster = countryMasterRepository.getCountryCodeValue(countryId);
+		logger.debug("countrycode:"+countryMaster.getCountryCode());
+		String countrycode = countryMaster.getCountryCode();
+		String [] codes = {"005", "051", "009", "001", "010", "022"};
+		
+		if(Arrays.asList(codes).contains(countrycode)) {
+			isArabic = true;
+		}else {
+		isArabic = false;
+		}
+		logger.debug("isarabicValue" +isArabic);
+		return isArabic;
+		
+	}
+
+
+	public boolean isEgyptCountry(BigDecimal countryId) {
+		String countryAlfa3Code = countryRepository.findByLanguageIdAndCountryId(meta.getLanguageId(), countryId).get(0)
+				.getCountryAlpha3Code();
+		if (ConstantDocument.EGYPT_ALPHA3_CODE.equals(countryAlfa3Code)) {
+			return true;
+		}
+		return false;
+	}
+	
+	public List<CountryMasterDTO>getRoutingCountryList() {
+				
+		List<RoutingCountryModel> routingCountryModelList = iCountryRepo.findByLanguageId(meta.getLanguageId());
+		List<CountryMasterDTO> routingCountryDTOList = convertRoutingCountryList(routingCountryModelList);
+		
+		/** sorting based on the countryName **/
+		if(routingCountryDTOList!=null && !routingCountryDTOList.isEmpty()) {
+			Comparator<CountryMasterDTO> c = (s1, s2) -> s1.countryName.compareTo(s2.countryName);
+			routingCountryDTOList.sort(c);
+		}
+		
+		return routingCountryDTOList;
+	}
+	
+	public List<CountryMasterDTO> convertRoutingCountryList(List<RoutingCountryModel> routingCountryModelList){
+		List<CountryMasterDTO> routingCountryDTOList = new ArrayList<>();
+		for(RoutingCountryModel routingCountryModel:routingCountryModelList) {
+			CountryMasterDTO routingCountryDTO = new CountryMasterDTO();
+			routingCountryDTO.setResourceId(routingCountryModel.getCountryId());
+			routingCountryDTO.setResourceName(routingCountryModel.getCountryName());
+			routingCountryDTO.setResourceCode(routingCountryModel.getCountryISOCode());
+			routingCountryDTO.setCountryName(routingCountryModel.getCountryName());
+			routingCountryDTO.setCountryId(routingCountryModel.getCountryId());
+			routingCountryDTO.setCountryISOCode(routingCountryModel.getCountryISOCode());
+			routingCountryDTO.setBeneCountryRisk(routingCountryModel.getBeneCountryRisk());
+			routingCountryDTO.setCountryActive(routingCountryModel.getCountryActive());
+			routingCountryDTO.setCountryAlpha2Code(routingCountryModel.getCountryAlpha2Code());
+			routingCountryDTO.setCountryAlpha3Code(routingCountryModel.getCountryAlpha3Code());
+			routingCountryDTO.setCountryCode(routingCountryModel.getCountryCode());
+			routingCountryDTO.setCountryTelCode(routingCountryModel.getCountryTelCode());
+			routingCountryDTO.setCountryMobileLength(routingCountryModel.getCountryMobileLength());
+			routingCountryDTO.setCurrencyId(routingCountryModel.getCurrencyId());
+			routingCountryDTO.setIsActive(routingCountryModel.getIsActive());
+			routingCountryDTO.setLanguageCode(routingCountryModel.getLanguageCode());
+			routingCountryDTO.setLanguageId(routingCountryModel.getLanguageId());
+			routingCountryDTO.setLanguageName(routingCountryModel.getLanguageName());
+			routingCountryDTO.setNationality(routingCountryModel.getNationality());
+			routingCountryDTO.setQuoteName(routingCountryModel.getQuoteName());
+			routingCountryDTO.setRemitterCountryRisk(routingCountryModel.getRemitterCountryRisk());
+			routingCountryDTOList.add(routingCountryDTO);
+		}
+		return routingCountryDTOList;
+		
+		
+	}
+}
